@@ -39,7 +39,7 @@ public:
 
     ~http_html();
 
-    void send_head(int num,char* st, char* type,int w_len);
+    void send_head(int num, const char* st,const char* type,int w_len);
 
     void send_file();
 
@@ -51,7 +51,6 @@ public:
 
     char* get_file_type(const char *name);
 private:
-    char *type;
 
     char file[256];
 

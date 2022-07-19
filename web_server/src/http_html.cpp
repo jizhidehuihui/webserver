@@ -18,7 +18,7 @@ tcp_conn::tcp_conn(int connfd,event_loop* loop)
     m_loop=loop;
 
     int flag=fcntl(m_connfd,F_SETFL,0);
-    fcntl(m_connfd,F_SETFL,O_NONBLOCK);
+    fcntl(m_connfd,F_SETFL,O_NONBLOCK|flag);
 
      //2 设置TCP_NODELAY状态， 禁止读写缓存，降低小包延迟
     int op = 1;
@@ -64,7 +64,7 @@ void tcp_conn::do_read()
 
     printf("%s %s\n",method,path);
 
-    http_html* html=new http_html(path,strlen(path));
+    http_html *html=new http_html(path,strlen(path));
 
     std::cout<<html->sent_data()<<std::endl;
     std::cout<<html->send_len()<<std::endl;
@@ -72,17 +72,18 @@ void tcp_conn::do_read()
     r_buf.pop(len);
     r_buf.adjust();
 
+    
     //将处理完的数据放入到write_buffer中
     w_buf.wtite_data(html->sent_data(),html->send_len());
 
+    delete html;
 
     //注册写事件
 
-        if (active_epollout == true) 
+    if (active_epollout == true) 
     m_loop->add_io_event(m_connfd,conn_wr_callback,EPOLLOUT,this);
-
         
- 
+
 }
 
 void tcp_conn::do_write()
@@ -101,7 +102,7 @@ void tcp_conn::do_write()
             break;
         }
     }
-     std::cout<<w_buf.length();
+    std::cout<<w_buf.length();
     if(w_buf.length()==0)
     {
         m_loop->del_io_event(m_connfd,EPOLLOUT);
@@ -140,18 +141,39 @@ void conn_wr_callback(event_loop *loop,int fd,void *args)
 
 http_html::http_html(const char *path,int len)
 {
+
+ 
     bzero(data,m8M);
-    memcpy(file,"1.jpg",strlen("1.jpg"));
-    send_head(200,"ok","1.jpg",0);
+    bzero(file,256);
+
+#if 1
+    if(strcmp("/",path)==0)
+    {
+        memcpy(file,"hello.html",strlen("hello.html"));
+        send_head(200,"ok","hello.html",0);
+    }
+    else{
+        memcpy(file,path+1,strlen(path+1));
+        std::cout<<file<<std::endl;
+        send_head(200,"ok",path+1, 0);
+    }
+#endif
+
+   
     send_file();
+
+    
+}
+http_html::~http_html()
+{
 }
 
-void http_html::send_head(int num,char* st,char* type,int w_len)
+void http_html::send_head(int num,const char* st,const char* type, int w_len)
 {
     len+=sprintf(data,"http/1.1 %d %s\r\n",num,st);
     len+=sprintf(data+len,"Content-Type:%s\r\n",get_file_type(type));
     len+=sprintf(data+len,"Content-Lenght:%d\r\n",w_len);
-    len+=sprintf(data+len,"\r\n",2,0);
+    len+=sprintf(data+len,"\r\n");
 }
 
 void http_html::send_file()
@@ -173,7 +195,7 @@ void http_html::send_dir()
 
 }
 
-char* http_html::get_file_type(const char *name)
+char * http_html::get_file_type(const char *name)
 {
     const char *dot;
     dot=strrchr(name,'.');
